@@ -22,7 +22,7 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y build-essential zlib1g-dev libnghttp2-dev \
                libnghttp3-dev libngtcp2-dev libngtcp2-crypto-gnutls-dev \
-               libgnutls28-dev libssl-dev hardening-includes cppcheck nghttp2-client curl
+               libgnutls28-dev libssl-dev devscripts cppcheck nghttp2-client curl
 
       - name: Build mbedTLS
         run: make -C mbedtls CFLAGS="-O2 -fPIC" lib
@@ -77,7 +77,7 @@ jobs:
       - name: Install deps
         run: |
           sudo apt-get update 
-          sudo apt-get install -y build-essential
+          sudo apt-get install -y build-essential libnghttp2-dev
           
       - name: Build mbedTLS
         run: make -C mbedtls CFLAGS="-O2 -fPIC" lib

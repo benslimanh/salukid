@@ -133,12 +133,24 @@ static: clean $(BIN)
 
 # ---------- Reproducibility ----------
 repro:
-	$(eval T1 := $(shell SOURCE_DATE_EPOCH=1700000000 make clean all 2>&1 >/dev/null; sha256sum $(BIN)))
-	@sleep 1
-	$(eval T2 := $(shell SOURCE_DATE_EPOCH=1700000000 make clean all 2>&1 >/dev/null; sha256sum $(BIN)))
-	@echo "build1: $(T1)"; echo "build2: $(T2)"; \
-		test "$$(echo $(T1)|awk '{print $$1}')" = "$$(echo $(T2)|awk '{print $$1}')" \
-		&& echo "REPRODUCIBLE: OK" || (echo "REPRODUCIBLE: FAIL"; exit 1)
+	@echo "==> Running Build 1..."
+	@SOURCE_DATE_EPOCH=1700000000 $(MAKE) clean all >/dev/null 2>&1; \
+	T1=$$(sha256sum $(BIN) 2>/dev/null | awk '{print $$1}'); \
+	sleep 1; \
+	echo "==> Running Build 2..."; \
+	SOURCE_DATE_EPOCH=1700000000 $(MAKE) clean all >/dev/null 2>&1; \
+	T2=$$(sha256sum $(BIN) 2>/dev/null | awk '{print $$1}'); \
+	echo "build1: $$T1"; \
+	echo "build2: $$T2"; \
+	if [ -z "$$T1" ] || [ -z "$$T2" ]; then \
+		echo "REPRODUCIBLE: FAIL (Build process failed)"; \
+		exit 1; \
+	elif [ "$$T1" = "$$T2" ]; then \
+		echo "REPRODUCIBLE: OK"; \
+	else \
+		echo "REPRODUCIBLE: FAIL (Hashes mismatch)"; \
+		exit 1; \
+	fi
 
 # ---------- SBOM (SPDX) ----------
 sbom:
@@ -170,9 +182,9 @@ hardening-check: $(BIN)
 # ---------- Demo cert ----------
 certs/cert.pem certs/key.pem: certs
 	openssl req -x509 -newkey rsa:2048 -sha256 -days 365 -nodes \
-	    -keyout certs/key.pem -out certs/cert.pem \
-	    -subj "/C=MA/ST=TTA/L=Tangier/O=salukid/CN=localhost" \
-	    -addext "subjectAltName=DNS:localhost,IP:127.0.0.1"
+		-keyout certs/key.pem -out certs/cert.pem \
+		-subj "/C=MA/ST=TTA/L=Tangier/O=salukid/CN=localhost" \
+		-addext "subjectAltName=DNS:localhost,IP:127.0.0.1"
 
 certs:
 	mkdir -p certs
