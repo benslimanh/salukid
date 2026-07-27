@@ -323,7 +323,7 @@ static int write_one_stream(qconn_t *c, int64_t id)
         if (s->fd >= 0) {
             ssize_t rd = pread(s->fd, chunk, take, (off_t)s->off);
             if (rd <= 0) {
-                ngtcp2_conn_shutdown_stream(c->nc, 0, id, NGTCP2_NO_ERROR);
+                ngtcp2_conn_shutdown_stream(c->nc, id, NGTCP2_NO_ERROR);
                 return 0;
             }
             take = (size_t)rd;
@@ -449,11 +449,10 @@ static const nghttp3_callbacks h3cbs = {
     .end_stream = cb_h3_end,
     .reset_stream = cb_h3_reset,
     .shutdown = cb_h3_shut,
-    .recv_settings = cb_h3_settings,
 };
 
 /* ========== ngtcp2 callbacks ========== */
-static int cb_crypto(ngtcp2_conn *nc, ngtcp2_encryption_level lvl, uint64_t off,
+static int cb_crypto(ngtcp2_conn *nc, ngtcp2_crypto_level lvl, uint64_t off,
                      const uint8_t *d, size_t dl, void *u)
 {
     (void)u;
@@ -473,9 +472,9 @@ static int cb_hs_done(ngtcp2_conn *nc, void *u)
     if (rv != 0) { qlog("nghttp3_conn_server_new: %s", nghttp3_strerror(rv)); return NGTCP2_ERR_CALLBACK_FAILURE; }
     return 0;
 }
-static int cb_rxkey(ngtcp2_conn *nc, ngtcp2_encryption_level lvl, void *u)
+static int cb_rxkey(ngtcp2_conn *nc, ngtcp2_crypto_level lvl, void *u)
 { (void)u; return ngtcp2_crypto_derive_and_install_rx_key(nc, NULL, NULL, NULL, lvl, NULL, 0); }
-static int cb_txkey(ngtcp2_conn *nc, ngtcp2_encryption_level lvl, void *u)
+static int cb_txkey(ngtcp2_conn *nc, ngtcp2_crypto_level lvl, void *u)
 { (void)u; return ngtcp2_crypto_derive_and_install_tx_key(nc, NULL, NULL, NULL, lvl, NULL, 0); }
 static int cb_newcid(ngtcp2_conn *nc, ngtcp2_cid *cid, uint8_t *tok, size_t cl, void *u)
 {
@@ -594,7 +593,6 @@ static qconn_t *cnew(const ngtcp2_path *path,
     static const uint8_t srt[NGTCP2_STATELESS_RESET_TOKENLEN] = "salukid-h3-srt!!";
     memcpy(tp.stateless_reset_token, srt, NGTCP2_STATELESS_RESET_TOKENLEN);
     tp.original_dcid = *dcid;
-    tp.original_dcid_present = 1;
 
     int rv = ngtcp2_conn_server_new(&c->nc, dcid, scid, path, NGTCP2_PROTO_VER_V1,
                                     &nccbs, &s, &tp, NULL, c);
@@ -770,7 +768,7 @@ int main(int argc, char **argv)
                 qconn_t *c = *pp;
                 ngtcp2_conn_handle_expiry(c->nc, t);
                 flush_pkts(c);
-                if (ngtcp2_conn_in_closing_period(c->nc) || t - c->last > IDLE_NS) {
+                if (ngtcp2_conn_is_in_closing_period(c->nc) || t - c->last > IDLE_NS) {
                     *pp = c->next; cremove(c); cfree(c); continue;
                 }
                 pp = &(*pp)->next;
