@@ -27,6 +27,7 @@ LDLIBS   := -lnghttp2 -lssl -lmbedtls -lmbedx509 -lmbedcrypto -lz -ldl -lpthread
 
 # When using vendored mbedTLS, pick up its build tree
 ifneq ($(wildcard mbedtls/library/libmbedtls.a),)
+	MBEDTLS_DIR := $(CURDIR)/mbedtls
     MBED_LIBDIR := $(CURDIR)/mbedtls/library
     LDFLAGS += -L$(MBED_LIBDIR)
     CFLAGS  += -I$(CURDIR)/mbedtls/include
@@ -79,7 +80,7 @@ test: $(TEST_BIN)
 
 $(TEST_BIN): tests/parser_test.o src/parser.o src/util.o src/path.o src/gzip_etag.o src/metrics.o src/log.o src/ringbuf.o src/arena.o src/cache.o
 	$(CC) $(CSTD) $(WARN) -O0 -g -Iinclude -I./mbedtls/include -D_GNU_SOURCE -o $@ $^ -lz -lpthread -ldl $(MBED_LIBDIR)/libmbedtls.a $(MBED_LIBDIR)/libmbedx509.a $(MBED_LIBDIR)/libmbedcrypto.a -lssl -lcrypto 2>/dev/null || \
-	$(CC) $(CSTD) $(WARN) -O0 -g -Iinclude -I./mbedtls/include -D_GNU_SOURCE -o $@ $^ -lz -lpthread -ldl -lmbedtls -lmbedx509 -lmbedcrypto -lnghttp2 -lssl -lcrypto
+	$(CC) $(CSTD) $(WARN) -O0 -g -Iinclude -I./mbedtls/include -D_GNU_SOURCE -o $@ $^ -lz -lpthread -ldl -L$(MBEDTLS_DIR)/library -lmbedtls -lmbedx509 -lmbedcrypto -lssl -lcrypto
 
 # ---------- Fuzz ----------
 fuzz: CC=clang
