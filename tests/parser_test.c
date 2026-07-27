@@ -6,9 +6,14 @@
 #include <string.h>
 #include <stdlib.h>
 #include "common.h"
+#include "cache.h"
+#include "proxy.h"
 #include "parser.h"
 #include "path.h"
 #include "gzip_etag.h"
+
+cache_t g_cache;
+proxy_t g_proxy;
 
 static int failures = 0;
 http_request_t g_req;
