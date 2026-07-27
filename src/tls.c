@@ -22,6 +22,7 @@ int tls_init(const char *cert, const char *key, bool tls13_only,
              const char *ciphers, const char *ciphersuites)
 {
     (void)ciphers; (void)ciphersuites; /* mbedTLS cipher list is applied below */
+    tls_shutdown();
     mbedtls_x509_crt_init(&g_srvcert);
     mbedtls_pk_init(&g_srvkey);
     mbedtls_ctr_drbg_init(&g_ctr_drbg);
@@ -31,20 +32,20 @@ int tls_init(const char *cert, const char *key, bool tls13_only,
     const unsigned char pers[] = "salukid";
     if (mbedtls_ctr_drbg_seed(&g_ctr_drbg, mbedtls_entropy_func, &g_entropy,
                               pers, sizeof pers - 1) != 0)
-        return -1;
+        goto fail;
     if (mbedtls_x509_crt_parse_file(&g_srvcert, cert) != 0) {
         salukid_log(LOG_ERR, "TLS: cannot load cert %s", cert);
-        return -1;
+        goto fail;
     }
     if (mbedtls_pk_parse_keyfile(&g_srvkey, key, NULL,
                                  mbedtls_ctr_drbg_random, &g_ctr_drbg) != 0) {
         salukid_log(LOG_ERR, "TLS: cannot load key %s", key);
-        return -1;
+        goto fail;
     }
     if (mbedtls_ssl_config_defaults(&g_ssl_conf, MBEDTLS_SSL_IS_SERVER,
                                     MBEDTLS_SSL_TRANSPORT_STREAM,
                                     MBEDTLS_SSL_PRESET_DEFAULT) != 0)
-        return -1;
+        goto fail;
     mbedtls_ssl_conf_authmode(&g_ssl_conf, MBEDTLS_SSL_VERIFY_NONE);
     mbedtls_ssl_conf_rng(&g_ssl_conf, mbedtls_ctr_drbg_random, &g_ctr_drbg);
     mbedtls_ssl_conf_ca_chain(&g_ssl_conf, g_srvcert.next, NULL);
@@ -66,6 +67,10 @@ int tls_init(const char *cert, const char *key, bool tls13_only,
     (void)ciphersuites;
     mbedtls_ssl_conf_alpn_protocols(&g_ssl_conf, g_alpn_protos);
     return 0;
+
+fail:
+    tls_shutdown();
+    return -1;
 }
 
 void tls_shutdown(void)
