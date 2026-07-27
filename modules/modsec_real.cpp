@@ -141,7 +141,6 @@ static int on_init(void **ctxp, const char *cfg, size_t cl,
         } else {
             H->log(SALUKID_LOG_ERR, "modsec: failed to load %s: %s",
                    rule_path.c_str(), err ? err : "(unknown)");
-            if (err) { modsecurity::msc_rules_cleanup(err); err = nullptr; }
         }
     }
     if (!loaded_ok) {
@@ -149,7 +148,6 @@ static int on_init(void **ctxp, const char *cfg, size_t cl,
         if (modsecurity::msc_rules_add(g_rules, BUILTIN_RULES, &er2) < 0) {
             H->log(SALUKID_LOG_ERR, "modsec: failed to load builtin rules: %s",
                    er2 ? er2 : "(unknown)");
-            if (er2) modsecurity::msc_rules_cleanup(er2);
             return -1;
         }
         H->log(SALUKID_LOG_INFO, "modsec: loaded builtin rules (ids 1001-1004)");

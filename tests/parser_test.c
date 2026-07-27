@@ -66,7 +66,7 @@ static void test_chunked_headers(void)
     const char p2[] = "ample.com\r\n\r\n";
     size_t consumed = 0;
     int rc = http_request_parse(&g_req, p1, sizeof p1 - 1, &consumed);
-    EXPECT(rc == SALUKID_AGAIN, "partial headers return AGAIN");
+    EXPECT(rc == SALUKID_RC_AGAIN, "partial headers return AGAIN");
     char buf[512]; size_t L = sizeof p1 - 1 + sizeof p2 - 1;
     memcpy(buf, p1, sizeof p1 - 1); memcpy(buf + sizeof p1 - 1, p2, sizeof p2 - 1);
     reset_req();
