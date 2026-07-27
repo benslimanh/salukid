@@ -1,0 +1,13 @@
+# Set default behavior for all files
+* text=auto
+
+# Enforce LF for shell scripts to avoid execution errors on Linux
+*.sh text eol=lf
+
+# Hide vendored libraries from GitHub language statistics
+mbedtls/** linguist-vendored
+
+# Explicitly define code files
+*.c text
+*.h text
+*.cpp text

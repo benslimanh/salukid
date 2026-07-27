@@ -1,0 +1,16 @@
+.git
+mbedtls
+certs
+build
+dist
+out
+*.o
+*.a
+secure_httpd
+secure_httpd_quic
+tests/parser_test
+fuzz/parser_fuzz
+modules/*.so
+**/__pycache__
+**/.pytest_cache
+node_modules

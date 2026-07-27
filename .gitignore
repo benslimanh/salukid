@@ -1,0 +1,24 @@
+# Build artifacts
+secure_httpd
+secure_httpd_quic
+*.o
+*.d
+*.so
+tests/parser_test
+fuzz/parser_fuzz
+mbedtls/build/
+certs/*.pem
+compile_commands.json
+clangd-cache/
+*.gcda
+*.gcno
+*.gcov
+coverage/
+
+# Temporary test outputs
+*.log
+/tmp/h3.*
+
+# Editor / OS junk
+*~
+.DS_Store

@@ -1,0 +1,7 @@
+title = "salukid gitleaks config"
+[allowlist]
+  description = "False positives and test certs"
+  paths = [
+    '''certs/''',
+    '''tests/''',
+  ]
