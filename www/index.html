@@ -1,0 +1,33 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8"/>
+  <meta name="viewport" content="width=device-width,initial-scale=1"/>
+  <title>salukid</title>
+  <style>
+    body{font:16px/1.5 -apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;max-width:720px;margin:2rem auto;padding:0 1rem;color:#eee;background:#111}
+    h1{font-size:2.2rem;margin:0 0 .2rem}
+    code,kbd,pre{font:13px/1.4 ui-monospace,Menlo,Consolas,monospace;background:#1a1a1a;border-radius:6px;padding:.1rem .35rem}
+    pre{padding:.8rem 1rem;overflow:auto}
+    a{color:#7cc4ff}
+    .muted{color:#888}
+    ul{padding-left:1.2rem}
+  </style>
+</head>
+<body>
+  <h1>salukid <span class="muted">// secure_httpd</span></h1>
+  <p>A hardened, high-performance HTTP server in C serving HTTP/1.1, HTTP/2, and HTTP/3.</p>
+
+  <h2>Endpoints</h2>
+  <ul>
+    <li><a href="/healthz">/healthz</a> &mdash; liveness probe</li>
+    <li><a href="/metrics">/metrics</a> &mdash; Prometheus metrics</li>
+    <li><a href="/_hello">/_hello</a> &mdash; sample dlopen module (if loaded)</li>
+  </ul>
+
+  <h2>Test it</h2>
+<pre>$ curl -k --http2 https://localhost:8443/
+$ curl -k --http3 https://localhost:8443/
+$ curl  http://localhost:8080/metrics</pre>
+</body>
+</html>
