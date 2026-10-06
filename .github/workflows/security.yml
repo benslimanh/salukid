@@ -1,0 +1,109 @@
+name: security
+
+on:
+  push: { branches: [main] }
+  pull_request: { branches: [main] }
+  schedule:
+    - cron: '27 6 * * 1'
+  workflow_dispatch: {}
+
+permissions:
+  contents: read
+  security-events: write
+  actions: read
+
+jobs:
+  codeql:
+    name: CodeQL
+    runs-on: ubuntu-latest
+    strategy: { matrix: { lang: ['cpp'] } }
+    steps:
+      - uses: actions/checkout@v4
+      - uses: github/codeql-action/init@v3
+        with: { languages: ${{ matrix.lang }} }
+      - run: sudo apt-get update && sudo apt-get install -y --no-install-recommends zlib1g-dev libnghttp2-dev libssl-dev
+      - run: make -j$(nproc)
+      - uses: github/codeql-action/analyze@v3
+
+  cppcheck:
+    name: cppcheck
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: sudo apt-get install -y cppcheck
+      - run: |
+          cppcheck --enable=all --inconclusive --std=c11 --error-exitcode=1 \
+                   --suppress=missingIncludeSystem --suppress=unusedFunction \
+                   -Iinclude src/ quic_server.c 2>&1 | tee cppcheck.log
+
+  gitleaks:
+    name: Secret scanning (gitleaks)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with: { fetch-depth: 0 }
+      - uses: gitleaks/gitleaks-action@v2
+        env: { GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }} }
+
+  trivy:
+    name: Trivy (fs + image)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Run trivy filesystem scan
+        uses: aquasecurity/trivy-action@master
+        with:
+          scan-type: fs
+          scan-ref: .
+          format: table
+          severity: CRITICAL,HIGH
+          exit-code: '1'
+          ignore-unfixed: true
+
+  grype:
+    name: Grype
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: anchore/scan-action@v3
+        id: grype
+        with:
+          path: "."
+          fail-build: true
+          severity-cutoff: high
+
+  osv:
+    name: OSV Scanner
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Run OSV-Scanner
+        uses: google/osv-scanner-action/osv-scanner-action@v1.9.0
+        with:
+          scan-args: |-
+            --recursive
+            --skip-git
+            ./
+
+  fuzzer:
+    name: libFuzzer (ASan/UBSan)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: |
+          sudo apt-get update && sudo apt-get install -y clang zlib1g-dev
+          make fuzz CC=clang
+          mkdir -p fuzz/corpus
+          printf 'GET / HTTP/1.1\r\nHost: a\r\n\r\n' > fuzz/corpus/basic
+          ./fuzz/parser_fuzz -max_total_time=60 -timeout=5 -rss_limit_mb=2048 fuzz/corpus
+
+  opa-policy:
+    name: OPA policy gate (no root containers, no latest tags)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: open-policy-agent/setup-opa@v2
+        with: { version: latest }
+      - run: |
+          opa test .github/policies -v
+          opa eval -d .github/policies --input Dockerfile 'data.docker.deny' || true

@@ -1,0 +1,64 @@
+name: ci
+
+on:
+  push: { branches: [main] }
+  pull_request: { branches: [main] }
+  workflow_dispatch: {}
+
+permissions:
+  contents: read
+
+jobs:
+  build-test:
+    name: Build & unit test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install deps
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y build-essential zlib1g-dev libnghttp2-dev \
+               libnghttp3-dev libssl-dev hardening-includes cppcheck
+      - name: Vendor mbedTLS
+        run: |
+          git clone --depth 1 --recurse-submodules --shallow-submodules -b v3.6.2 \
+            https://github.com/Mbed-TLS/mbedtls.git mbedtls
+          make -C mbedtls CFLAGS="-O2 -fPIC" lib
+      - name: Build
+        run: make -j$(nproc)
+      - name: Build H3
+        run: make -j$(nproc) quic
+      - name: Unit tests
+        run: make test
+      - name: Hardening check
+        run: make hardening-check
+      - name: Upload binaries
+        uses: actions/upload-artifact@v4
+        with:
+          name: secure_httpd
+          path: |
+            secure_httpd
+            secure_httpd_quic
+
+  repro:
+    name: Reproducibility gate
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install deps
+        run: sudo apt-get update && sudo apt-get install -y build-essential zlib1g-dev libnghttp2-dev libssl-dev
+      - name: Vendor mbedTLS
+        run: |
+          git clone --depth 1 --recurse-submodules --shallow-submodules -b v3.6.2 \
+            https://github.com/Mbed-TLS/mbedtls.git mbedtls
+          make -C mbedtls CFLAGS="-O2 -fPIC" lib
+      - name: repro
+        run: make repro
+
+  module-build:
+    name: Build sample module
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: sudo apt-get install -y build-essential
+      - run: make mod

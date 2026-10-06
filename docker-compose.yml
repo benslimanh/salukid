@@ -1,0 +1,25 @@
+services:
+  salukid:
+    build: .
+    image: ghcr.io/example/salukid:dev
+    container_name: salukid
+    restart: unless-stopped
+    ports:
+      - "8080:8080"
+      - "8443:8443/tcp"
+      - "8443:8443/udp"
+    read_only: true
+    cap_drop: ["ALL"]
+    security_opt:
+      - "no-new-privileges:true"
+    user: "65532:65532"
+    tmpfs:
+      - /tmp:size=8m,mode=1777
+    volumes:
+      - ./certs:/certs:ro
+    command: ["-p","8080","-T","8443","-C","/certs/cert.pem","-K","/certs/key.pem","-r","/www","-w","0","-j"]
+    healthcheck:
+      test: ["CMD", "/bin/sh", "-c", "exit 0"]
+      interval: 10s
+      timeout: 2s
+      retries: 3
