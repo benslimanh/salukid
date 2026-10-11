@@ -1,0 +1,21 @@
+/var/log/salukid/*.log {
+    daily
+    rotate 14
+    missingok
+    notifempty
+    compress
+    delaycompress
+    sharedscripts
+    dateext
+    # 100 MB cap per file
+    size 100M
+    postrotate
+        # Ask salukid parent (and all children via pgrep -f) to reopen logs.
+        # systemctl reload sends SIGHUP; we use SIGUSR1 for log reopen.
+        if [ -x /bin/systemctl ]; then
+            /bin/systemctl kill -s SIGUSR1 salukid.service >/dev/null 2>&1 || true
+        else
+            /usr/bin/pkill -USR1 -x secure_httpd >/dev/null 2>&1 || true
+        fi
+    endscript
+}

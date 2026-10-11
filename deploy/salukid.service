@@ -1,0 +1,65 @@
+[Unit]
+Description=salukid HTTP/HTTPS server
+Documentation=https://github.com/salukid/salukid
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+# Run as a dedicated unprivileged user. Create with:
+#   useradd -r -s /usr/sbin/nologin -d /var/lib/salukid salukid
+User=salukid
+Group=salukid
+
+# Working directory = document root parent; -r is absolute below.
+WorkingDirectory=/var/lib/salukid
+
+# Bind to low ports via CAP_NET_BIND_SERVICE instead of running as root.
+# Alternative: use AmbientCapabilities and pre-bound sockets.
+# For true root-drop: start as root, drop to User via salukid's -u flag
+# (we do NOT pass -u here; set User= to "root" if you want salukid's own
+# privilege-drop after binding).
+ExecStart=/usr/local/sbin/secure_httpd \
+    -p 8080 \
+    -T 8443 \
+    -C /etc/salukid/cert.pem \
+    -K /etc/salukid/key.pem \
+    -r /var/lib/salukid/www \
+    -w 0 \
+    -l /var/log/salukid/access.log \
+    -S \
+    -j \
+    -A "${SALUKID_ADMIN_TOKEN}"
+
+# Hardening
+NoNewPrivileges=true
+ProtectSystem=strict
+ProtectHome=true
+PrivateTmp=true
+PrivateDevices=true
+ProtectControlGroups=true
+ProtectKernelModules=true
+ProtectKernelTunables=true
+RestrictSUIDSGID=true
+LockPersonality=true
+MemoryDenyWriteExecute=true
+SystemCallArchitectures=native
+ReadWritePaths=/var/log/salukid /var/lib/salukid
+CapabilityBoundingSet=CAP_NET_BIND_SERVICE
+AmbientCapabilities=CAP_NET_BIND_SERVICE
+
+# Reload = SIGUSR1 (reopen log for logrotate)
+# SIGHUP  = graceful reload (cache purge, module reload, children notified)
+ExecReload=/bin/kill -HUP $MAINPID
+KillMode=mixed
+KillSignal=SIGTERM
+TimeoutStopSec=10
+Restart=always
+RestartSec=1
+
+# Limits
+LimitNOFILE=65536
+LimitNPROC=4096
+
+[Install]
+WantedBy=multi-user.target
