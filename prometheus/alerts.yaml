@@ -1,0 +1,50 @@
+groups:
+  - name: salukid.rules
+    rules:
+      - alert: SalukidDown
+        expr: up{job="salukid"} == 0
+        for: 1m
+        labels:   { severity: critical }
+        annotations:
+          summary: "salukid instance {{ $labels.instance }} down"
+          description: "Targets in job salukid are unreachable for >1m."
+
+      - alert: SalukidHighErrorRate
+        expr: |
+          sum by (instance) (
+             rate(salukid_requests_total{status=~"5.."}[5m])
+          ) / sum by (instance) (rate(salukid_requests_total[5m])) > 0.05
+        for: 5m
+        labels:   { severity: warning }
+        annotations:
+          summary: "salukid 5xx rate >5% on {{ $labels.instance }}"
+
+      - alert: SalukidCircuitBreakerTripped
+        expr: increase(salukid_circuit_breaker_trips[5m]) > 0
+        for: 1m
+        labels:   { severity: warning }
+        annotations:
+          summary: "salukid circuit breaker tripping on {{ $labels.instance }}"
+
+      - alert: SalukidHighCacheMiss
+        expr: |
+          sum(rate(salukid_cache_misses[5m]))
+          / (sum(rate(salukid_cache_hits[5m])) + sum(rate(salukid_cache_misses[5m]))) > 0.8
+        for: 10m
+        labels: { severity: info }
+        annotations:
+          summary: "salukid cache miss ratio >80%"
+
+      - alert: SalukidLogDrops
+        expr: increase(salukid_log_drops[5m]) > 0
+        for: 1m
+        labels: { severity: warning }
+        annotations:
+          summary: "salukid dropping log records"
+
+      - alert: SalukidSaturation
+        expr: salukid_active_connections > 5000
+        for: 2m
+        labels: { severity: warning }
+        annotations:
+          summary: "salukid active connections high on {{ $labels.instance }}"

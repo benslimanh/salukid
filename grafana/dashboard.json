@@ -1,0 +1,63 @@
+{
+  "annotations": { "list": [] },
+  "editable": true,
+  "fiscalYearStartMonth": 0,
+  "graphTooltip": 1,
+  "links": [],
+  "liveNow": false,
+  "panels": [
+    {
+      "title": "QPS",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 0 },
+      "targets": [{ "expr": "rate(salukid_requests_total[1m])", "legendFormat": "{{instance}}" }]
+    },
+    {
+      "title": "Active connections",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 0 },
+      "targets": [{ "expr": "salukid_active_connections", "legendFormat": "{{instance}}" }]
+    },
+    {
+      "title": "Error rate (5xx)",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 8 },
+      "targets": [
+        { "expr": "sum by (instance)(rate(salukid_requests_total{status=~\"5..\"}[1m]))", "legendFormat": "5xx {{instance}}" }
+      ]
+    },
+    {
+      "title": "Cache hit ratio",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 8 },
+      "targets": [
+        { "expr": "sum(rate(salukid_cache_hits[1m])) / (sum(rate(salukid_cache_hits[1m])) + sum(rate(salukid_cache_misses[1m])))", "legendFormat": "hit ratio" }
+      ]
+    },
+    {
+      "title": "Bytes sent / sec",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 16 },
+      "targets": [{ "expr": "rate(salukid_bytes_sent[1m])", "legendFormat": "{{instance}}" }]
+    },
+    {
+      "title": "Proxy / circuit breaker",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 16 },
+      "targets": [
+        { "expr": "rate(salukid_proxy_errors[1m])", "legendFormat": "proxy errors {{instance}}" },
+        { "expr": "increase(salukid_circuit_breaker_trips[5m])", "legendFormat": "cb trips" }
+      ]
+    }
+  ],
+  "schemaVersion": 38,
+  "style": "dark",
+  "tags": ["salukid", "http"],
+  "templating": { "list": [] },
+  "time": { "from": "now-1h", "to": "now" },
+  "timepicker": {},
+  "timezone": "",
+  "title": "salukid",
+  "uid": "salukid",
+  "version": 1
+}

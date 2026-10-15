@@ -1,0 +1,25 @@
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: salukid
+  namespace: monitoring
+  labels: {release: prometheus}
+spec:
+  selector: {matchLabels: {app: salukid}}
+  namespaceSelector: {matchNames: [salukid]}
+  endpoints:
+  - port: http
+    path: /metrics
+    interval: 15s
+    scrapeTimeout: 5s
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: salukid-metrics
+  namespace: salukid
+  labels: {app: salukid}
+spec:
+  selector: {app: salukid}
+  ports:
+  - {name: http, port: 8080, targetPort: http, protocol: TCP}
