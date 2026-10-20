@@ -1,0 +1,44 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "salukid.fullname" . }}
+  labels: {{- include "salukid.labels" . | nindent 4 }}
+spec:
+  replicas: {{ .Values.replicaCount }}
+  selector: {matchLabels: {{- include "salukid.selectorLabels" . | nindent 6 }}}
+  template:
+    metadata:
+      labels: {{- include "salukid.selectorLabels" . | nindent 8 }}
+      annotations:
+        seccomp.security.alpha.kubernetes.io/pod: runtime/default
+    spec:
+      automountServiceAccountToken: false
+      securityContext: {{- .Values.podSecurityContext | toYaml | nindent 8 }}
+      containers:
+      - name: salukid
+        image: "{{ .Values.image.repository }}:{{ .Values.image.tag | default .Chart.AppVersion }}"
+        imagePullPolicy: {{ .Values.image.pullPolicy }}
+        args: ["-p","8080","-T","8443","-C","/certs/cert.pem","-K","/certs/key.pem","-r","/www","-w","0"]
+        ports:
+        - {name: http,  containerPort: 8080, protocol: TCP}
+        - {name: https, containerPort: 8443, protocol: TCP}
+        - {name: h3,    containerPort: 8443, protocol: UDP}
+        readinessProbe: {httpGet: {path: /healthz, port: http}, periodSeconds: 2}
+        livenessProbe:  {httpGet: {path: /healthz, port: http}, periodSeconds: 10}
+        resources: {{- .Values.resources | toYaml | nindent 10 }}
+        securityContext: {{- .Values.securityContext | toYaml | nindent 10 }}
+        volumeMounts:
+        - {name: certs, mountPath: /certs, readOnly: true}
+        - {name: tmp,   mountPath: /tmp}
+        {{- if .Values.www.configMap }}
+        - {name: www, mountPath: /www, readOnly: true}
+        {{- end }}
+      volumes:
+      - name: certs
+        secret: {secretName: {{ .Values.tls.secretName }}}
+      - name: tmp
+        emptyDir: {medium: Memory, sizeLimit: 8Mi}
+      {{- if .Values.www.configMap }}
+      - name: www
+        configMap: {name: {{ .Values.www.configMap }}}
+      {{- end }}

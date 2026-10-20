@@ -1,0 +1,55 @@
+replicaCount: 3
+
+image:
+  repository: ghcr.io/example/salukid
+  pullPolicy: IfNotPresent
+  tag: ""
+
+imagePullSecrets: []
+nameOverride: ""
+fullnameOverride: ""
+
+service:
+  type: ClusterIP
+  http: 80
+  https: 443
+  h3: 443
+
+resources:
+  requests: {cpu: 50m, memory: 64Mi}
+  limits:   {cpu: "1", memory: 256Mi}
+
+autoscaling:
+  enabled: true
+  minReplicas: 3
+  maxReplicas: 20
+  targetCPUUtilizationPercentage: 65
+  targetMemoryUtilizationPercentage: 70
+
+podSecurityContext:
+  runAsNonRoot: true
+  runAsUser: 65532
+  runAsGroup: 65532
+  fsGroup: 65532
+  seccompProfile: {type: RuntimeDefault}
+
+securityContext:
+  allowPrivilegeEscalation: false
+  capabilities: {drop: [ALL]}
+  readOnlyRootFilesystem: true
+  runAsNonRoot: true
+  privileged: false
+
+tls:
+  secretName: salukid-tls
+
+www:
+  # if set, mounts the named ConfigMap as /www
+  configMap: ""
+
+networkPolicy:
+  enabled: true
+
+metrics:
+  enabled: true
+  serviceMonitor: false

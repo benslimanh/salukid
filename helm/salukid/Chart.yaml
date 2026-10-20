@@ -1,0 +1,12 @@
+apiVersion: v2
+name: salukid
+description: Hardened, high-performance HTTP/1.1+H2+H3 server for Kubernetes
+type: application
+version: 0.1.0
+appVersion: "0.1.0"
+keywords: [http, http2, http3, quic, hardened, webserver]
+home: https://github.com/example/salukid
+sources:
+  - https://github.com/example/salukid
+maintainers:
+  - name: salukid maintainers

@@ -1,0 +1,83 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: salukid
+  namespace: salukid
+  labels: {app: salukid}
+spec:
+  replicas: 3
+  selector: {matchLabels: {app: salukid}}
+  template:
+    metadata:
+      labels: {app: salukid}
+      annotations:
+        seccomp.security.alpha.kubernetes.io/pod: runtime/default
+        container.apparmor.security.beta.kubernetes.io/salukid: runtime/default
+    spec:
+      automountServiceAccountToken: false
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 65532
+        runAsGroup: 65532
+        fsGroup: 65532
+        seccompProfile: {type: RuntimeDefault}
+      containers:
+      - name: salukid
+        image: ghcr.io/example/salukid:latest
+        imagePullPolicy: IfNotPresent
+        args: ["-p","8080","-T","8443","-C","/certs/cert.pem","-K","/certs/key.pem","-r","/www","-w","0"]
+        ports:
+        - {name: http,  containerPort: 8080, protocol: TCP}
+        - {name: https, containerPort: 8443, protocol: TCP}
+        - {name: h3,    containerPort: 8443, protocol: UDP}
+        readinessProbe: {httpGet: {path: /healthz, port: http}, periodSeconds: 2, timeoutSeconds: 1}
+        livenessProbe:  {httpGet: {path: /healthz, port: http}, periodSeconds: 10, timeoutSeconds: 2}
+        resources:
+          requests: {cpu: "50m", memory: "64Mi"}
+          limits:   {cpu: "1",    memory: "256Mi"}
+        securityContext:
+          allowPrivilegeEscalation: false
+          capabilities: {drop: ["ALL"]}
+          readOnlyRootFilesystem: true
+          runAsNonRoot: true
+          runAsUser: 65532
+          privileged: false
+        volumeMounts:
+        - {name: certs, mountPath: /certs, readOnly: true}
+        - {name: tmp,   mountPath: /tmp}
+      volumes:
+      - name: certs
+        secret: {secretName: salukid-tls}
+      - name: tmp
+        emptyDir: {medium: Memory, sizeLimit: 8Mi}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: salukid
+  namespace: salukid
+spec:
+  selector: {app: salukid}
+  ports:
+  - {name: http,  port: 80,  targetPort: http,  protocol: TCP}
+  - {name: https, port: 443, targetPort: https, protocol: TCP}
+  - {name: h3,    port: 443, targetPort: h3,    protocol: UDP}
+  type: ClusterIP
+---
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata: {name: salukid, namespace: salukid}
+spec: {minAvailable: 2, selector: {matchLabels: {app: salukid}}}
+---
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata: {name: salukid, namespace: salukid}
+spec:
+  scaleTargetRef: {apiVersion: apps/v1, kind: Deployment, name: salukid}
+  minReplicas: 3
+  maxReplicas: 20
+  metrics:
+  - type: Resource
+    resource: {name: cpu, target: {type: Utilization, averageUtilization: 65}}
+  - type: Resource
+    resource: {name: memory, target: {type: Utilization, averageUtilization: 70}}
