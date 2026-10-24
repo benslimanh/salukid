@@ -1,0 +1,21 @@
+--- worker.c
++++ worker.c
+@@ -134,13 +134,17 @@
+                 conn_t *c = p;
+                 if (!c) { continue; }
+                 if (events[i].events & (EPOLLERR|EPOLLHUP|EPOLLRDHUP)) {
++                    salukid_log(LOG_ERR, "EPOLL error/hup/rdhup %x", events[i].events);
+                     conn_unregister(epfd, c); conn_destroy(c); continue;
+                 }
+                 if (events[i].events & EPOLLIN) {
+                     conn_on_readable(c);
+                 }
+                 if (events[i].events & EPOLLOUT) {
+                     conn_on_writable(c);
+                 }
+-                if (c->want_close) { conn_unregister(epfd, c); conn_destroy(c); continue; }
++                if (c->want_close) {
++                    salukid_log(LOG_ERR, "want_close=true state=%d", c->state);
++                    conn_unregister(epfd, c); conn_destroy(c); continue;
++                }
+                 conn_modify(epfd, c);

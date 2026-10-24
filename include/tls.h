@@ -15,6 +15,7 @@ extern mbedtls_ssl_config    g_ssl_conf;
 
 int  tls_init(const char *cert, const char *key, bool tls13_only,
               const char *ciphers, const char *ciphersuites);
+int  tls_worker_init(void);
 void tls_shutdown(void);
 int  tls_handshake(conn_t *c);    /* SALUKID_OK / AGAIN / ERR */
 

@@ -56,15 +56,21 @@ static void wasm_log(wasm_exec_env_t ee, uint32_t lvl, wasm_ptr_t addr, uint32_t
     wasm_state_t *s = wasm_runtime_get_user_data(ee); (void)s;
     char *b = wasm_runtime_addr_app_to_native(s->inst, addr);
     if (!b) return;
-    char *tmp = alloca((size_t)len+1); memcpy(tmp, b, len); tmp[len]=0;
+    char *tmp = malloc((size_t)len+1);
+    if (!tmp) return;
+    memcpy(tmp, b, len); tmp[len]=0;
     H->log(SALUKID_LOG_INFO, "wasm: %s", tmp);
+    free(tmp);
 }
 static uint32_t wasm_get_header(wasm_exec_env_t ee, uint32_t t, wasm_ptr_t na, uint32_t nl,
                                wasm_ptr_t va, uint32_t vcap) {
     wasm_state_t *s = wasm_runtime_get_user_data(ee);
     char *nk = wasm_runtime_addr_app_to_native(s->inst, na); if (!nk) return 1;
-    char *nb = alloca((size_t)nl+1); memcpy(nb, nk, nl); nb[nl] = 0;
+    char *nb = malloc((size_t)nl+1);
+    if (!nb) return 1;
+    memcpy(nb, nk, nl); nb[nl] = 0;
     const char *v = H->header_get(s->cur_req, nb);
+    free(nb);
     if (!v) return 1;
     char *ob = wasm_runtime_addr_app_to_native(s->inst, va); size_t vl = strlen(v);
     if (vcap <= vl) return 1;

@@ -16,6 +16,7 @@
 #include "modapi.h"
 #include "ringbuf.h"
 #include "subrequester.h"
+#include "proxy.h"
 #include <sys/epoll.h>
 
 extern cache_t g_cache;
@@ -28,7 +29,8 @@ extern volatile sig_atomic_t g_logrotate;
 
 static void conn_register(int epfd, conn_t *c)
 {
-    struct epoll_event ev = { .events = EPOLLIN | EPOLLET | EPOLLRDHUP, .data.ptr = c };
+    struct epoll_event ev = { .events = EPOLLIN | EPOLLRDHUP, .data.ptr = c };
+    if (c->tls && !c->ssl_hs_done) ev.events |= EPOLLOUT;
     epoll_ctl(epfd, EPOLL_CTL_ADD, c->fd, &ev);
 }
 
@@ -36,11 +38,15 @@ static void conn_modify(int epfd, conn_t *c)
 {
     struct epoll_event ev;
     ev.data.ptr = c;
-    ev.events = EPOLLET | EPOLLRDHUP;
-    if (c->state == CONN_READING) ev.events |= EPOLLIN;
-    if (c->state == CONN_WRITING) ev.events |= EPOLLOUT;
-    if (c->state == CONN_H2)      ev.events |= EPOLLIN | EPOLLOUT;
-    /* SUBREQ_PENDING: don't arm IN/OUT — wait for subrequester eventfd */
+    ev.events = EPOLLRDHUP;
+    if (c->tls && !c->ssl_hs_done) {
+        if (c->tls_want_read) ev.events |= EPOLLIN;
+        if (c->tls_want_write) ev.events |= EPOLLOUT;
+    } else {
+        if (c->state == CONN_READING) ev.events |= EPOLLIN;
+        if (c->state == CONN_WRITING) ev.events |= EPOLLOUT;
+        if (c->state == CONN_H2)      ev.events |= EPOLLIN | EPOLLOUT;
+    }
     epoll_ctl(epfd, EPOLL_CTL_MOD, c->fd, &ev);
 }
 
@@ -63,24 +69,28 @@ static void accept_all(int epfd, int lsock, bool tls, int wid)
         int one = 1;
         setsockopt(fd, IPPROTO_TCP, TCP_NODELAY, &one, sizeof one);
         conn_t *c = conn_create(fd, tls, wid);
-        if (!c) { close(fd); continue; }
         conn_register(epfd, c);
+        if (!c) { close(fd); continue; }
     }
 }
 
 static void drain_log(ringbuf_t *r, int outfd)
 {
     (void)outfd;
-    extern void log_drain_to_backend(ringbuf_t *r);
     log_drain_to_backend(r);
 }
 
 /* Special sentinel pointer that identifies the subrequester eventfd */
 static char g_subreq_sentinel;
 
-void worker_fn(int wid, int fd_http, int fd_https)
+extern void worker_fn(int wid, int fd_http, int fd_https); void worker_fn(int wid, int fd_http, int fd_https)
 {
     salukid_log(LOG_INFO, "worker %d started (pid=%d)", wid, getpid());
+    if (g_cfg.enable_proxy) proxy_start_hc(&g_proxy);
+    if (g_cfg.https_port > 0) {
+        if (!g_cfg.cert_path[0] || !g_cfg.key_path[0]) salukid_die("HTTPS enabled but -C/-K not provided");
+        if (tls_worker_init() < 0) salukid_die("TLS worker init failed");
+    }
     int epfd = epoll_create1(EPOLL_CLOEXEC);
     if (epfd < 0) salukid_die("epoll_create1: %s", strerror(errno));
 
@@ -122,11 +132,11 @@ void worker_fn(int wid, int fd_http, int fd_https)
             } else {
                 conn_t *c = p;
                 if (events[i].events & (EPOLLERR|EPOLLHUP|EPOLLRDHUP)) {
-                    conn_unregister(epfd, c); conn_destroy(c); continue;
+                    salukid_log(LOG_ERR, "Closing connection %d (want_close=%d, events=%x)", c->fd, c->want_close, events[i].events); conn_unregister(epfd, c); conn_destroy(c); continue;
                 }
                 if (events[i].events & EPOLLIN) conn_on_readable(c);
                 if (events[i].events & EPOLLOUT) conn_on_writable(c);
-                if (c->want_close) { conn_unregister(epfd, c); conn_destroy(c); continue; }
+                if (c->want_close) { salukid_log(LOG_ERR, "Closing connection %d (want_close=%d, events=%x)", c->fd, c->want_close, events[i].events); conn_unregister(epfd, c); conn_destroy(c); continue; }
                 conn_modify(epfd, c);
             }
         }

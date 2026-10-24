@@ -25,3 +25,4 @@ void log_emit(int level, int worker_id, const char *remote,
 void log_emit_plain(int level, const char *fmt, ...) SALUKID_PRINTF(2,3);
 
 #endif
+void log_drain_to_backend(ringbuf_t *r);

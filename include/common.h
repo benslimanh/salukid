@@ -8,7 +8,6 @@
 #ifndef SALUKID_COMMON_H
 #define SALUKID_COMMON_H
 
-#define _GNU_SOURCE
 #include <arpa/inet.h>
 #include <ctype.h>
 #include <dirent.h>
@@ -286,3 +285,5 @@ int salukid_prefork(int nworkers, void (*worker_fn)(int id, int fd_http, int fd_
 void salukid_install_signals(void);
 
 #endif /* SALUKID_COMMON_H */
+
+

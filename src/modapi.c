@@ -5,7 +5,7 @@
  * Modules loaded via dlopen have access to salukid services only through
  * the host vtable - they don't (and shouldn't) resolve internal symbols.
  */
-#define _GNU_SOURCE
+
 #include "modapi.h"
 #include "conn.h"
 #include "response.h"
@@ -256,7 +256,8 @@ static salukid_resp_t *H_resp_begin(salukid_req_t *r, int code) {
     return (salukid_resp_t*)hr;
 }
 static void H_resp_set_status(salukid_resp_t *rs, int code) {
-    if (!rs) return; response_set_status((http_response_t*)rs, code);
+    if (!rs) return;
+    response_set_status((http_response_t*)rs, code);
 }
 static salukid_resp_t *resp_default(salukid_resp_t *rs, salukid_req_t *r) {
     return rs ? rs : H_resp_begin(r, 200);
@@ -382,6 +383,8 @@ static void http_call_trampoline(conn_t *c, int status,
     if (!cb) return;
     /* Convert native subreq_kv_t (NUL-term strings) to salukid_kv_t */
     salukid_kv_t stack_kv[16];
+    memset(stack_kv, 0, sizeof(stack_kv));
+    memset(stack_kv, 0, sizeof(stack_kv));
     salukid_kv_t *kvp = stack_kv;
     if (nhdrs > 16) {
         kvp = calloc(nhdrs, sizeof *kvp);

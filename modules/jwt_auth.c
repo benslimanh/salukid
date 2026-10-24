@@ -253,7 +253,7 @@ deny_500: {
 static int hex_decode(uint8_t *out, size_t cap, const char *hex)
 {
     size_t hl = strlen(hex); size_t n = 0;
-    if (hl > cap*2) return -1;
+    if (hl % 2 != 0 || hl > cap*2) return -1;
     for (size_t i = 0; i+1 < hl; i += 2) {
         unsigned int byte;
         if (sscanf(hex+i, "%2x", &byte) != 1) return -1;

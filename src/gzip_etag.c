@@ -5,7 +5,7 @@
 
 void etag_for(const struct stat *st, char *out, size_t outsz)
 {
-    if (!st || !out || outsz < 16) return;
+    if (!st || !out || outsz < 64) return;
     /* "<hex-size>-<hex-mtime>-<hex-inode>" */
     snprintf(out, outsz, "\"%llx-%llx-%llx\"",
              (unsigned long long)st->st_size,

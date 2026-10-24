@@ -9,7 +9,7 @@
  * Subrequests are heap-allocated, owned by the pool from submit until
  * drain/cancel, so connection close / arena reset cannot UAF.
  */
-#define _GNU_SOURCE
+
 #include "subrequester.h"
 #include "log.h"
 #include <netdb.h>

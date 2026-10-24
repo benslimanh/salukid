@@ -58,6 +58,8 @@ typedef struct conn {
     mbedtls_ssl_config   ssl_conf;
     bool                 ssl_ready;      /* ssl ctx initialised (ssl_init+setup done) */
     bool                 ssl_hs_done;    /* TLS handshake completed successfully */
+    bool                 tls_want_read;
+    bool                 tls_want_write;
 
     /* HTTP/2 state */
     nghttp2_session   *h2;

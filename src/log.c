@@ -128,7 +128,7 @@ void log_emit(int level, int worker_id, const char *remote,
               const char *method, const char *path, int status,
               size_t bytes, uint64_t duration_us)
 {
-    char tbuf[64];
+    char tbuf[128];
     struct timespec ts;
     clock_gettime(CLOCK_REALTIME, &ts);
     struct tm tm;

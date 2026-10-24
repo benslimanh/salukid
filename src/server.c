@@ -28,7 +28,7 @@ salukid_modlist_t*g_modlist = NULL;
 int               g_lsock_http = -1;
 int               g_lsock_https = -1;
 
-extern void worker_fn(int wid, int fd_http, int fd_https);
+
 
 static void usage(const char *argv0)
 {
@@ -107,7 +107,7 @@ int main(int argc, char **argv)
                 if (g_cfg.nv1modules < 16) {
                     char *colon = strchr(optarg, ':');
                     if (colon) {
-                        size_t pl = (size_t)(colon - optarg);
+                        int pl = (int)(colon - optarg); if (pl >= 4096) pl = 4095;
                         snprintf(g_cfg.v1modules[g_cfg.nv1modules], SALUKID_PATH_MAX,
                                  "%.*s", (int)pl, optarg);
                         snprintf(g_cfg.v1modcfg[g_cfg.nv1modules],
@@ -170,7 +170,7 @@ int main(int argc, char **argv)
         proxy_init(&g_proxy, g_cfg.proxy_upstream, g_cfg.cb_threshold,
                    g_cfg.cb_recovery_ms) < 0)
         salukid_die("proxy init failed");
-    if (g_cfg.enable_proxy) proxy_start_hc(&g_proxy);
+    
 
     admin_init(g_cfg.admin_token[0] ? g_cfg.admin_token : getenv("SALUKID_ADMIN_TOKEN"));
 
@@ -186,6 +186,7 @@ int main(int argc, char **argv)
             salukid_die("cannot load v1 module %s", g_cfg.v1modules[i]);
     }
 
+    
     if (g_cfg.https_port > 0) {
         if (!g_cfg.cert_path[0] || !g_cfg.key_path[0])
             salukid_die("HTTPS enabled but -C/-K not provided");
@@ -196,6 +197,7 @@ int main(int argc, char **argv)
     }
 
     /* Listen sockets (one per worker, via SO_REUSEPORT) */
+extern void worker_fn(int wid, int fd_http, int fd_https);
     int nw = g_cfg.num_workers > 0 ? g_cfg.num_workers : (int)sysconf(_SC_NPROCESSORS_ONLN);
     if (nw < 1) nw = 1;
     if (nw > 256) nw = 256;

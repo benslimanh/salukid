@@ -365,12 +365,14 @@ int proxy_do(proxy_t *p, arena_t *a, const char *path,
     if (eoh) {
         if (len > 12 && !memcmp(buf, "HTTP/1.", 7) && isdigit((unsigned char)buf[9]))
             status = (buf[9]-'0')*100 + (buf[10]-'0')*10 + (buf[11]-'0');
+        *eoh = '\0';
         char *ctp = strcasestr(buf, "content-type:");
         if (ctp) {
             ctp += 13; while (*ctp == ' ') ctp++;
             char *crlf = strstr(ctp, "\r\n");
             if (crlf) { size_t L = MIN((size_t)(crlf - ctp), (size_t)63); memcpy(ct, ctp, L); ct[L]='\0'; }
         }
+        *eoh = '\r';
         char *body = eoh + 4;
         size_t blen = len - (size_t)(body - buf);
         char *out = arena_alloc(a, blen + 1);

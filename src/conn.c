@@ -35,7 +35,7 @@
 extern salukid_module_t *g_modules;
 extern salukid_modlist_t*g_modlist;
 extern cache_t           g_cache;
-extern proxy_t           g_proxy;
+
 extern slab_t            g_conn_slab;
 
 static uint64_t ns_now(void)
@@ -167,7 +167,10 @@ static int conn_flush_h2(conn_t *c)
             n = mbedtls_ssl_write(&c->ssl, (const uint8_t*)s->base + off, s->len - off);
             if (n == MBEDTLS_ERR_SSL_WANT_READ || n == MBEDTLS_ERR_SSL_WANT_WRITE)
                 return SALUKID_RC_AGAIN;
-            if (n < 0) return SALUKID_ERR;
+            if (n < 0) {
+                salukid_log(LOG_ERR, "mbedtls_ssl_write returned %d", (int)n);
+                return SALUKID_ERR;
+            }
         } else {
             n = write(c->fd, (const char*)s->base + off, s->len - off);
             if (n < 0 && (errno == EAGAIN || errno == EWOULDBLOCK)) return SALUKID_RC_AGAIN;
@@ -196,7 +199,10 @@ int conn_flush(conn_t *c)
             if (c->tls && c->ssl_ready) {
                 n = mbedtls_ssl_write(&c->ssl, (const uint8_t*)s->base + off, s->len - off);
                 if (n == MBEDTLS_ERR_SSL_WANT_READ || n == MBEDTLS_ERR_SSL_WANT_WRITE) return SALUKID_RC_AGAIN;
-                if (n < 0) return SALUKID_ERR;
+                if (n < 0) {
+                    salukid_log(LOG_ERR, "mbedtls_ssl_write2 returned %d", (int)n);
+                    return SALUKID_ERR;
+                }
             } else {
                 n = write(c->fd, (const char*)s->base + off, s->len - off);
                 if (n < 0 && (errno == EAGAIN || errno == EWOULDBLOCK)) return SALUKID_RC_AGAIN;
@@ -281,8 +287,6 @@ int conn_flush(conn_t *c)
 
 /* ---------- Dispatch ---------- */
 
-int serve_request_on_conn(conn_t *c);
-int finalize_conn_response(conn_t *c);
 
 static int serve_request(conn_t *c)
 {
@@ -577,7 +581,7 @@ void conn_on_readable(conn_t *c)
                     if (have < need) {
                         size_t take = need - have;
                         if (take > avail) take = avail;
-                        if (http_request_body_append(&c->req, c->rbuf + after_hdrs, take) < 0) {
+                        if (http_request_body_append(&c->req, (const char*)((const char*)(c->rbuf + after_hdrs)), take) < 0) {
                             /* 413 */
                             http_response_t *r3 = &c->resp;
                             response_init(r3, &c->arena, false, false);
@@ -602,7 +606,7 @@ void conn_on_readable(conn_t *c)
                     size_t ch_consumed = 0;
                     bool ch_done = false;
                     int cr = http_request_chunked_feed(&c->req,
-                                c->rbuf + after_hdrs, avail, &ch_consumed, &ch_done);
+                                (const char*)((const char*)(c->rbuf + after_hdrs)), avail, &ch_consumed, &ch_done);
                     if (cr < 0) {
                         http_response_t *r3 = &c->resp;
                         response_init(r3, &c->arena, false, false);
@@ -631,7 +635,7 @@ void conn_on_readable(conn_t *c)
                  * more bytes from the network. Compact the rbuf so
                  * unconsumed body bytes are at the front. */
                 if (after_hdrs < c->rbuf_len)
-                    memmove(c->rbuf, c->rbuf + after_hdrs, c->rbuf_len - after_hdrs);
+                    memmove(c->rbuf, (const char*)((const char*)(c->rbuf + after_hdrs)), c->rbuf_len - after_hdrs);
                 c->rbuf_len -= after_hdrs;
                 /* Avoid keeping a huge parsed flag while waiting for body */
                 if (c->rbuf_len == 0) c->rbuf_parsed = 0;
@@ -666,11 +670,23 @@ void conn_on_readable(conn_t *c)
 
 void conn_on_writable(conn_t *c)
 {
+    if (c->tls && !c->ssl_hs_done) {
+        int hr = tls_handshake(c);
+        if (hr == SALUKID_RC_AGAIN) return;
+        if (hr == SALUKID_ERR) { c->want_close = true; return; }
+        if (c->h2_active) {
+            if (c->whead) {
+                int fr = conn_flush_h2(c);
+                if (fr == SALUKID_ERR) { c->want_close = true; return; }
+            }
+        }
+        conn_on_readable(c);
+        return;
+    }
+
     if (c->h2_active) {
         c->state = CONN_H2;
-        /* Try to push more H2 frames (e.g. window updates) */
         h2_flush(c);
-        /* Also flush any queued outgoing slices */
         int rc = conn_flush_h2(c);
         if (rc == SALUKID_ERR) c->want_close = true;
         return;

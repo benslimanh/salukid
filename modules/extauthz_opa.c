@@ -69,7 +69,7 @@ static int on_req_hdr(void *ctx, salukid_req_t *r)
          "\"host\":\"%s\",\"remote_addr\":\"%s\","
          "\"headers\":{\"authorization\":\"%s\"}}}",
         m, (int)pl, p, host, H->remote_addr(r), authz);
-    if (il < 0) goto fail_500;
+    if (il < 0 || (size_t)il >= sizeof(input)) goto fail_500;
 
     subrequest_t *sr = subrequest_new();
     if (!sr) goto fail_500;

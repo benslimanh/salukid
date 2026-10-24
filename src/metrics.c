@@ -9,7 +9,6 @@
 
 metrics_t *g_metrics;
 extern cache_t g_cache;
-extern proxy_t g_proxy;
 
 int metrics_init(void)
 {

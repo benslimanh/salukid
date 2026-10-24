@@ -274,7 +274,7 @@ static int on_frame_recv(nghttp2_session *s, const nghttp2_frame *frame, void *u
 
     char fs[SALUKID_PATH_MAX]; struct stat stbuf; bool isdir = false;
     const uint8_t *body = NULL; size_t blen = 0;
-    int status = HTTP_404; char ctype[96] = "text/plain";
+    int status = HTTP_404; char ctype[96] = "text/plain"; (void)status;
     char etag[32] = {0};
     bool has_body_fd = false; size_t file_total = 0;
     int resp_status = HTTP_404;
@@ -304,7 +304,7 @@ static int on_frame_recv(nghttp2_session *s, const nghttp2_frame *frame, void *u
                         }
                     }
                     resp_status = have_range ? HTTP_206 : HTTP_200;
-                    size_t send_len = have_range ? (range_end - range_start + 1) : file_total;
+                    size_t send_len = have_range ? (range_end - range_start + 1) : file_total; (void)send_len;
                     if (!st->head_only) {
                         if (file_total <= 131072) {
                             uint8_t *buf = arena_alloc(&c->arena, file_total);
@@ -473,6 +473,7 @@ int h2_want_readwrite(conn_t *c, bool *want_read, bool *want_write)
     return 0;
 }
 
+static
 int h2_stream_read(conn_t *c, int32_t stream_id, uint8_t *buf, size_t len, size_t *rlen)
 {
     (void)c; (void)stream_id; (void)buf; (void)len; *rlen = 0;

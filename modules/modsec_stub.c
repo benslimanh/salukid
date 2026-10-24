@@ -33,20 +33,24 @@ static int looks_like_injection(const char *s, size_t n)
         "../../../etc/passwd",
     };
     if (!s) return 0;
-    char *lc = alloca(n + 1);
+    char *lc = malloc(n + 1);
+    if (!lc) return 0;
     for (size_t i = 0; i < n; i++) lc[i] = (char)tolower((unsigned char)s[i]);
     lc[n] = '\0';
-    for (size_t i = 0; i < sizeof needles / sizeof needles[0]; i++)
-        if (strstr(lc, needles[i])) return 1;
-    return 0;
+    int found = 0;
+    for (size_t i = 0; i < sizeof needles / sizeof needles[0]; i++) {
+        if (strstr(lc, needles[i])) { found = 1; break; }
+    }
+    free(lc);
+    return found;
 }
 
 static int bad_ua(const char *ua)
 {
     if (!ua) return 0;
-    return !!strstr(ua, "sqlmap") | !!strstr(ua, "Nikto") |
-           !!strstr(ua, "nmap")   | !!strstr(ua, "dirbuster") |
-           !!strstr(ua, "acunetix");
+    return (strstr(ua, "sqlmap") || strstr(ua, "Nikto") ||
+           strstr(ua, "nmap")   || strstr(ua, "dirbuster") ||
+           strstr(ua, "acunetix")) ? 1 : 0;
 }
 
 static int deny(salukid_req_t *r, int code, const char *msg)

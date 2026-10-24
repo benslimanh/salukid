@@ -26,29 +26,47 @@ int tls_init(const char *cert, const char *key, bool tls13_only,
     if (g_tls_ready) tls_shutdown();
     mbedtls_x509_crt_init(&g_srvcert);
     mbedtls_pk_init(&g_srvkey);
-    mbedtls_ctr_drbg_init(&g_ctr_drbg);
-    mbedtls_entropy_init(&g_entropy);
     mbedtls_ssl_config_init(&g_ssl_conf);
 
-    const unsigned char pers[] = "salukid";
-    if (mbedtls_ctr_drbg_seed(&g_ctr_drbg, mbedtls_entropy_func, &g_entropy,
-                              pers, sizeof pers - 1) != 0)
+    /* Use a temporary RNG to parse the key.
+     * The actual worker RNG is initialized in tls_worker_init. */
+    mbedtls_ctr_drbg_context temp_drbg;
+    mbedtls_entropy_context temp_entropy;
+    mbedtls_ctr_drbg_init(&temp_drbg);
+    mbedtls_entropy_init(&temp_entropy);
+
+    const unsigned char pers[] = "salukid_init";
+    if (mbedtls_ctr_drbg_seed(&temp_drbg, mbedtls_entropy_func, &temp_entropy,
+                              pers, 12) != 0) {
+        mbedtls_ctr_drbg_free(&temp_drbg);
+        mbedtls_entropy_free(&temp_entropy);
         goto fail;
+    }
+
     if (mbedtls_x509_crt_parse_file(&g_srvcert, cert) != 0) {
         salukid_log(LOG_ERR, "TLS: cannot load cert %s", cert);
+        mbedtls_ctr_drbg_free(&temp_drbg);
+        mbedtls_entropy_free(&temp_entropy);
         goto fail;
     }
     if (mbedtls_pk_parse_keyfile(&g_srvkey, key, NULL,
-                                 mbedtls_ctr_drbg_random, &g_ctr_drbg) != 0) {
+                                 mbedtls_ctr_drbg_random, &temp_drbg) != 0) {
         salukid_log(LOG_ERR, "TLS: cannot load key %s", key);
+        mbedtls_ctr_drbg_free(&temp_drbg);
+        mbedtls_entropy_free(&temp_entropy);
         goto fail;
     }
+
+    mbedtls_ctr_drbg_free(&temp_drbg);
+    mbedtls_entropy_free(&temp_entropy);
+
     if (mbedtls_ssl_config_defaults(&g_ssl_conf, MBEDTLS_SSL_IS_SERVER,
                                     MBEDTLS_SSL_TRANSPORT_STREAM,
                                     MBEDTLS_SSL_PRESET_DEFAULT) != 0)
         goto fail;
     mbedtls_ssl_conf_authmode(&g_ssl_conf, MBEDTLS_SSL_VERIFY_NONE);
-    mbedtls_ssl_conf_rng(&g_ssl_conf, mbedtls_ctr_drbg_random, &g_ctr_drbg);
+    /* RNG will be linked in tls_worker_init */
+    
     mbedtls_ssl_conf_ca_chain(&g_ssl_conf, g_srvcert.next, NULL);
     if (mbedtls_ssl_conf_own_cert(&g_ssl_conf, &g_srvcert, &g_srvkey) != 0)
         return -1;
@@ -61,11 +79,6 @@ int tls_init(const char *cert, const char *key, bool tls13_only,
         mbedtls_ssl_conf_min_version(&g_ssl_conf, MBEDTLS_SSL_MAJOR_VERSION_3,
                                      MBEDTLS_SSL_MINOR_VERSION_3); /* TLS 1.2+ */
     }
-    /* Cipher override (-o) is accepted but the mbedTLS API requires
-     * constructing an int[] of cipher suite IDs; we leave the safe
-     * default and document this in the deployment guide. */
-    (void)ciphers;
-    (void)ciphersuites;
     mbedtls_ssl_conf_alpn_protocols(&g_ssl_conf, g_alpn_protos);
     g_tls_ready = true;
     return 0;
@@ -73,6 +86,23 @@ int tls_init(const char *cert, const char *key, bool tls13_only,
 fail:
     tls_shutdown();
     return -1;
+}
+
+int tls_worker_init(void)
+{
+    if (!g_tls_ready) return 0; // Not initialized or not HTTPS
+
+    mbedtls_ctr_drbg_init(&g_ctr_drbg);
+    mbedtls_entropy_init(&g_entropy);
+
+    const unsigned char pers[] = "salukid_worker";
+    if (mbedtls_ctr_drbg_seed(&g_ctr_drbg, mbedtls_entropy_func, &g_entropy,
+                              pers, 12) != 0) {
+        return -1;
+    }
+
+    mbedtls_ssl_conf_rng(&g_ssl_conf, mbedtls_ctr_drbg_random, &g_ctr_drbg);
+    return 0;
 }
 
 void tls_shutdown(void)
@@ -96,11 +126,12 @@ int tls_handshake(conn_t *c)
                             (mbedtls_ssl_recv_t*)mbedtls_net_recv, NULL);
         c->ssl_ready = true;
         c->ssl_hs_done = false;
+        c->tls_want_read = true;
+        c->tls_want_write = true;
     }
-    if (c->ssl_hs_done) {
-        /* Already completed; ALPN/h2 init handled on initial completion. */
-        return SALUKID_OK;
-    }
+    if (c->ssl_hs_done) return SALUKID_OK;
+    c->tls_want_read = false;
+    c->tls_want_write = false;
     int rc = mbedtls_ssl_handshake(&c->ssl);
     if (rc == 0) {
         c->ssl_hs_done = true;
@@ -112,10 +143,7 @@ int tls_handshake(conn_t *c)
         }
         return SALUKID_OK;
     }
-    if (rc == MBEDTLS_ERR_SSL_WANT_READ || rc == MBEDTLS_ERR_SSL_WANT_WRITE)
-        return SALUKID_RC_AGAIN;
-    char ebuf[256];
-    mbedtls_strerror(rc, ebuf, sizeof ebuf);
-    salukid_log(LOG_ERR, "TLS handshake failed: %s", ebuf);
+    if (rc == MBEDTLS_ERR_SSL_WANT_READ) { c->tls_want_read = true; return SALUKID_RC_AGAIN; }
+    if (rc == MBEDTLS_ERR_SSL_WANT_WRITE) { c->tls_want_write = true; return SALUKID_RC_AGAIN; }
     return SALUKID_ERR;
 }

@@ -50,6 +50,7 @@ int safe_resolve_path(const char *root, const char *uri_path, size_t uri_plen,
         while (i < uri_plen && uri_path[i] != '/') {
             char c = uri_path[i];
             if (c == '\0' || c == '\\') return -1;
+            if (c == '%' && i + 2 < uri_plen && uri_path[i+1] == '0' && uri_path[i+2] == '0') return -1;
             i++;
         }
         size_t seg_len = i - seg_start;

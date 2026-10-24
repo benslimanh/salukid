@@ -31,7 +31,7 @@ void SALUKID_PRINTF(2,3) salukid_log(int level, const char *fmt, ...)
     clock_gettime(CLOCK_REALTIME, &ts);
     struct tm tm;
     localtime_r(&ts.tv_sec, &tm);
-    char tbuf[32];
+    char tbuf[128];
     snprintf(tbuf, sizeof tbuf, "%04d-%02d-%02dT%02d:%02d:%02d.%03ld",
              tm.tm_year+1900, tm.tm_mon+1, tm.tm_mday,
              tm.tm_hour, tm.tm_min, tm.tm_sec, ts.tv_nsec/1000000);
