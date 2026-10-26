@@ -334,11 +334,21 @@ int serve_request_on_conn(conn_t *c)
         size_t bl = 0; char *b = metrics_render_prometheus(&bl);
         response_set_status(resp, HTTP_200);
         response_set_content_type(resp, "text/plain; version=0.0.4");
-        if (b && !resp->head_only) response_add_buf(resp, b, bl);
+        
+        if (b && !resp->head_only) {
+            
+            char *safe_buf = arena_alloc(&c->arena, bl);
+            if (safe_buf) {
+                memcpy(safe_buf, b, bl); 
+                response_add_buf(resp, safe_buf, bl); 
+            }
+        }
+        
         resp->total_len = bl; resp->has_body = true;
         free(b);
         goto emit;
     }
+    
     if (req->path_len == strlen(SALUKID_HEALTHZ_PATH) &&
         memcmp(req->path, SALUKID_HEALTHZ_PATH, req->path_len) == 0) {
         const char *b = "ok";
