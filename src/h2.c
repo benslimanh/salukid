@@ -196,6 +196,52 @@ static int on_frame_recv(nghttp2_session *s, const nghttp2_frame *frame, void *u
         }
     }
 
+    /* /metrics shortcut */
+    if (g_cfg.enable_metrics &&
+        plen == strlen(SALUKID_METRICS_PATH) &&
+        memcmp(path, SALUKID_METRICS_PATH, plen) == 0) {
+        
+        size_t bl = 0; 
+        char *b = metrics_render_prometheus(&bl);
+        
+        nghttp2_nv hdrs[32]; int nh = 0;
+        nv_add(hdrs, &nh, ":status", "200");
+        nv_add(hdrs, &nh, "content-type", "text/plain; version=0.0.4");
+        char clb[24]; snprintf(clb, sizeof clb, "%zu", bl);
+        nv_add(hdrs, &nh, "content-length", clb);
+        nv_add(hdrs, &nh, "server", SALUKID_SERVER_NAME);
+        nh = nv_add_standard_headers(hdrs, nh, 32);
+
+        if (b && !st->head_only && bl > 0) {
+            /* تخصيص مساحة آمنة للمؤشرات وبيانات الإحصائيات معاً في الـ Arena */
+            drv_t *d = arena_alloc(&c->arena, sizeof *d + sizeof *st + bl);
+            if (!d) return NGHTTP2_ERR_CALLBACK_FAILURE;
+            
+            h2_stream_t *fp = (h2_stream_t*)(d + 1); 
+            *fp = *st;
+            
+            uint8_t *safe_buf = (uint8_t*)(fp + 1);
+            memcpy(safe_buf, b, bl); /* النسخ الآمن */
+
+            d->p = safe_buf; 
+            d->len = bl;
+            fp->body_len = bl; 
+            fp->content_len = bl; 
+            fp->mem = safe_buf;
+            fp->off = 0;
+            
+            nghttp2_data_provider pr; memset(&pr, 0, sizeof pr);
+            pr.read_callback = drv_read; pr.source.ptr = d;
+            nghttp2_session_set_stream_user_data(s, sid, fp);
+            nghttp2_submit_response(s, sid, hdrs, (size_t)nh, &pr);
+        } else {
+            nghttp2_submit_response(s, sid, hdrs, (size_t)nh, NULL);
+        }
+        
+        if (g_metrics) g_metrics->requests_total++;
+        return 0;
+    }
+
     /* /healthz shortcut */
     if (plen == strlen(SALUKID_HEALTHZ_PATH) &&
         memcmp(path, SALUKID_HEALTHZ_PATH, plen) == 0) {
