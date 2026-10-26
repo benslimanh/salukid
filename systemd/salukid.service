@@ -1,0 +1,16 @@
+[Unit]
+Description=Salukid High-Performance Web Server
+After=network.target
+
+[Service]
+Type=simple
+# Start as root to bind privileged ports (<1024) and read SSL keys.
+# Salukid automatically drops privileges to the 'nobody' user after binding.
+ExecStart=/usr/local/bin/secure_httpd -p 80 -T 443 -C /etc/salukid/ssl/server.crt -K /etc/salukid/ssl/server.key -r /var/www/salukid -w 4 -l /var/log/salukid/error.log
+ExecReload=/bin/kill -HUP $MAINPID
+Restart=on-abnormal
+LimitNOFILE=65536
+KillMode=mixed
+
+[Install]
+WantedBy=multi-user.target
