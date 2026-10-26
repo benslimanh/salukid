@@ -10,6 +10,7 @@ mbedtls_pk_context            g_srvkey;
 mbedtls_ctr_drbg_context      g_ctr_drbg;
 mbedtls_entropy_context       g_entropy;
 mbedtls_ssl_config            g_ssl_conf;
+static bool                   g_tls_ready = false;
 
 /* ALPN protocol list (must be static because mbedtls stores the pointer
  * for the lifetime of the ssl_config -- a compound literal inside
@@ -22,7 +23,7 @@ int tls_init(const char *cert, const char *key, bool tls13_only,
              const char *ciphers, const char *ciphersuites)
 {
     (void)ciphers; (void)ciphersuites; /* mbedTLS cipher list is applied below */
-    tls_shutdown();
+    if (g_tls_ready) tls_shutdown();
     mbedtls_x509_crt_init(&g_srvcert);
     mbedtls_pk_init(&g_srvkey);
     mbedtls_ctr_drbg_init(&g_ctr_drbg);
@@ -66,6 +67,7 @@ int tls_init(const char *cert, const char *key, bool tls13_only,
     (void)ciphers;
     (void)ciphersuites;
     mbedtls_ssl_conf_alpn_protocols(&g_ssl_conf, g_alpn_protos);
+    g_tls_ready = true;
     return 0;
 
 fail:
@@ -75,11 +77,13 @@ fail:
 
 void tls_shutdown(void)
 {
+    if (!g_tls_ready) return;
     mbedtls_x509_crt_free(&g_srvcert);
     mbedtls_pk_free(&g_srvkey);
     mbedtls_ssl_config_free(&g_ssl_conf);
     mbedtls_ctr_drbg_free(&g_ctr_drbg);
     mbedtls_entropy_free(&g_entropy);
+    g_tls_ready = false;
 }
 
 int tls_handshake(conn_t *c)
