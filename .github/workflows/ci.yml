@@ -14,24 +14,31 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+      
       - name: Install deps
         run: |
           sudo apt-get update
           sudo apt-get install -y build-essential zlib1g-dev libnghttp2-dev \
-               libnghttp3-dev libssl-dev hardening-includes cppcheck
-      - name: Vendor mbedTLS
-        run: |
-          git clone --depth 1 --recurse-submodules --shallow-submodules -b v3.6.2 \
-            https://github.com/Mbed-TLS/mbedtls.git mbedtls
-          make -C mbedtls CFLAGS="-O2 -fPIC" lib
+               libnghttp3-dev libngtcp2-dev libngtcp2-crypto-gnutls-dev \
+               libgnutls28-dev libssl-dev hardening-includes cppcheck nghttp2-client curl
+
+      - name: Build mbedTLS
+        run: make -C mbedtls CFLAGS="-O2 -fPIC" lib
+
       - name: Build
         run: make -j$(nproc)
+
       - name: Build H3
         run: make -j$(nproc) quic
+
       - name: Unit tests
         run: make test
+
       - name: Hardening check
         run: make hardening-check
+
       - name: Upload binaries
         uses: actions/upload-artifact@v4
         with:
@@ -45,13 +52,17 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+          
       - name: Install deps
-        run: sudo apt-get update && sudo apt-get install -y build-essential zlib1g-dev libnghttp2-dev libssl-dev
-      - name: Vendor mbedTLS
         run: |
-          git clone --depth 1 --recurse-submodules --shallow-submodules -b v3.6.2 \
-            https://github.com/Mbed-TLS/mbedtls.git mbedtls
-          make -C mbedtls CFLAGS="-O2 -fPIC" lib
+          sudo apt-get update 
+          sudo apt-get install -y build-essential zlib1g-dev libnghttp2-dev libssl-dev
+
+      - name: Build mbedTLS
+        run: make -C mbedtls CFLAGS="-O2 -fPIC" lib
+
       - name: repro
         run: make repro
 
@@ -60,5 +71,16 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - run: sudo apt-get install -y build-essential
-      - run: make mod
+        with:
+          submodules: recursive 
+          
+      - name: Install deps
+        run: |
+          sudo apt-get update 
+          sudo apt-get install -y build-essential
+          
+      - name: Build mbedTLS
+        run: make -C mbedtls CFLAGS="-O2 -fPIC" lib
+
+      - name: Build Modules
+        run: make mod
