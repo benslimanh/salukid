@@ -1,4 +1,4 @@
-# salukid — Zero-Dependency Edge Gateway
+# syzygy — Zero-Dependency Edge Gateway
 
 A hardened, high-performance **C11** HTTP edge server delivering **~70k RPS** on a single x86_64 core with native **TLS 1.3**, **HTTP/2**, and **HTTP/3 (QUIC)** end-to-end — no nginx, envoy, or haproxy required. Ships as a single ~1 MB PIE binary with built-in WAF, JWT auth, reverse proxy with circuit breaker, gzip, ETag/304, and Prometheus metrics.
 
